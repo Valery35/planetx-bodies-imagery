@@ -1,0 +1,54 @@
+# PlanetX Lite - глобус PlanetX без QGIS.
+# Copyright (C) 2026 ООО «Информ++». Лицензия Apache 2.0.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Разовая нарезка снимков Луны из мозаики LROC WAC 100 м (scripts/wac.py),
+# запуск вручную. Мозаика читается из хранилища astrogeo-ard USGS по сети.
+# Уровни 0-7 - здесь, подробнее программа читает мозаику сама. Тайлы
+# уходят в ветку main частями меньше 2 ГБ - предел одной отправки GitHub.
+
+name: Нарезка снимков Луны
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wac
+  cancel-in-progress: false
+
+jobs:
+  wac:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      GDAL_HTTP_MULTIRANGE: "YES"
+      GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"
+      GDAL_CACHEMAX: "2048"
+      CPL_VSIL_CURL_CACHE_SIZE: "1073741824"
+      GDAL_DISABLE_READDIR_ON_OPEN: "EMPTY_DIR"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GDAL
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gdal-bin python3-gdal python3-numpy python3-pil
+
+      - name: Нарезать и отправить
+        run: |
+          git config user.name "planetx-bodies"
+          git config user.email "planetx-bodies@users.noreply.github.com"
+          url="https://astrogeo-ard.s3.us-west-2.amazonaws.com/moon/basemaps/lroc_wac_mosaic/lroc_wac_mosaic_global_303ppd_v3/lroc_wac_mosaic_global_303ppd_v3.tif"
+          send() {
+            git add moon
+            git commit -q -m "$1" || return 0
+            git push -q origin HEAD:main
+          }
+          python3 scripts/wac.py "$url" 180 moon 0 6
+          send "Луна LROC WAC, уровни 0-6"
+          python3 scripts/wac.py "$url" 180 moon 7 7
+          send "Луна LROC WAC, уровень 7"
+          du -sh moon
