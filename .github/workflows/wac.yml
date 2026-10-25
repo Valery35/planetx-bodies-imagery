@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Разовая нарезка снимков Луны из мозаики LROC WAC 100 м (scripts/wac.py),
-# запуск вручную. Мозаика читается из хранилища astrogeo-ard USGS по сети.
+# запуск вручную или правкой этой задачи и скрипта. Мозаика читается из хранилища astrogeo-ard USGS по сети.
 # Уровни 0-7 - здесь, подробнее программа читает мозаику сама. Тайлы
 # уходят в ветку main частями меньше 2 ГБ - предел одной отправки GitHub.
 
@@ -11,6 +11,11 @@ name: Нарезка снимков Луны
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/wac.yml
+      - scripts/wac.py
 
 permissions:
   contents: write
