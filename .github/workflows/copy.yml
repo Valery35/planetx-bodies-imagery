@@ -1,0 +1,51 @@
+# PlanetX Lite - глобус PlanetX без QGIS.
+# Copyright (C) 2026 ООО «Информ++». Лицензия Apache 2.0.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Разовая копия снимков Марса (scripts/copy.sh), запуск вручную. Тайлы
+# уходят в ветку main частями меньше 2 ГБ - предел одной отправки GitHub:
+# уровни 0-6 одной частью, уровень 7 - четырьмя по столбцам x.
+
+name: Копия снимков
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: copy
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Скачать
+        run: bash scripts/copy.sh tiles 0 7
+
+      - name: Отправить
+        run: |
+          git config user.name "planetx-bodies"
+          git config user.email "planetx-bodies@users.noreply.github.com"
+          send() {
+            git add mars
+            git commit -q -m "$1" || return 0
+            git push -q origin HEAD:main
+          }
+          mkdir -p mars
+          for z in 0 1 2 3 4 5 6; do
+            if [ -d "tiles/mars/$z" ]; then mv "tiles/mars/$z" mars/; fi
+          done
+          send "Марс Viking, уровни 0-6"
+          mkdir -p mars/7
+          for part in 0 1 2 3; do
+            for x in $(seq $(( part * 32 )) $(( part * 32 + 31 ))); do
+              if [ -d "tiles/mars/7/$x" ]; then mv "tiles/mars/7/$x" mars/7/; fi
+            done
+            send "Марс Viking, уровень 7, часть $(( part + 1 )) из 4"
+          done
